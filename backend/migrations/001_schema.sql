@@ -876,6 +876,147 @@ CREATE TRIGGER ensure_single_current_version_trigger
     FOR EACH ROW EXECUTE FUNCTION ensure_single_current_version();
 
 -- ============================================================================
+-- REPLICATION TABLES
+-- ============================================================================
+
+-- S3 Replication Jobs Table - Tracks async replication of files to secondary S3 bucket
+CREATE TABLE IF NOT EXISTS replication_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    storage_path TEXT NOT NULL,                    -- S3 key to replicate
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    operation VARCHAR(20) NOT NULL,                -- 'upload' | 'delete'
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending | processing | completed | failed
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 5,
+    next_retry_at TIMESTAMPTZ DEFAULT NOW(),
+    error_message TEXT,
+    source_size_bytes BIGINT,                      -- For progress tracking
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    
+    CONSTRAINT valid_operation CHECK (operation IN ('upload', 'delete')),
+    CONSTRAINT valid_status CHECK (status IN ('pending', 'processing', 'completed', 'failed'))
+);
+
+-- Replication indexes
+CREATE INDEX IF NOT EXISTS idx_replication_jobs_status ON replication_jobs(status) WHERE status IN ('pending', 'processing');
+CREATE INDEX IF NOT EXISTS idx_replication_jobs_next_retry ON replication_jobs(next_retry_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_replication_jobs_tenant ON replication_jobs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_replication_jobs_created ON replication_jobs(created_at);
+CREATE INDEX IF NOT EXISTS idx_replication_jobs_storage_path ON replication_jobs(storage_path);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_replication_jobs_unique_pending 
+ON replication_jobs(storage_path, operation) 
+WHERE status IN ('pending', 'processing');
+
+-- ============================================================================
+-- VIRUS SCANNING TABLES
+-- ============================================================================
+
+-- Per-tenant virus scan settings
+CREATE TABLE IF NOT EXISTS virus_scan_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    file_types TEXT[] DEFAULT '{}', -- Empty means scan all files
+    max_file_size_mb INTEGER DEFAULT 100, -- Skip files larger than this
+    action_on_detect VARCHAR(20) NOT NULL DEFAULT 'quarantine', -- 'delete', 'quarantine', 'flag'
+    notify_admin BOOLEAN NOT NULL DEFAULT true,
+    notify_uploader BOOLEAN NOT NULL DEFAULT false,
+    auto_suspend_uploader BOOLEAN NOT NULL DEFAULT FALSE,
+    suspend_threshold INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(tenant_id)
+);
+
+-- Virus scan job queue
+CREATE TABLE IF NOT EXISTS virus_scan_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    file_id UUID NOT NULL REFERENCES files_metadata(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'scanning', 'completed', 'failed', 'skipped'
+    priority INTEGER NOT NULL DEFAULT 0, -- Higher = more urgent
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_attempt_at TIMESTAMPTZ,
+    next_retry_at TIMESTAMPTZ, -- For exponential backoff (30s, 2min, 10min)
+    error_message TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Virus scan results and metrics
+CREATE TABLE IF NOT EXISTS virus_scan_results (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    file_id UUID NOT NULL REFERENCES files_metadata(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    scan_job_id UUID REFERENCES virus_scan_jobs(id) ON DELETE SET NULL,
+    is_infected BOOLEAN NOT NULL DEFAULT false,
+    threat_name TEXT, -- Name of detected virus/malware
+    file_size_bytes BIGINT NOT NULL,
+    scan_duration_ms INTEGER NOT NULL, -- For performance metrics
+    scanner_version TEXT, -- ClamAV version
+    signature_version TEXT, -- Virus definition version
+    action_taken VARCHAR(20), -- 'deleted', 'quarantined', 'flagged', 'none'
+    scanned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    scanned_by TEXT DEFAULT 'clamav' -- Scanner identifier
+);
+
+-- Quarantined files (for 'quarantine' action)
+CREATE TABLE IF NOT EXISTS quarantined_files (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    original_file_id UUID NOT NULL, -- Don't FK since file may be deleted
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    original_filename TEXT NOT NULL,
+    original_path TEXT NOT NULL,
+    storage_path TEXT NOT NULL, -- Where quarantined file is stored
+    threat_name TEXT NOT NULL,
+    file_size_bytes BIGINT,
+    owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    quarantined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    quarantined_by UUID REFERENCES users(id), -- System or user who triggered
+    released_at TIMESTAMPTZ, -- If admin releases the file
+    released_by UUID REFERENCES users(id),
+    permanently_deleted_at TIMESTAMPTZ,
+    deleted_by UUID REFERENCES users(id)
+);
+
+-- Track user malware upload counts per tenant
+CREATE TABLE IF NOT EXISTS user_malware_counts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    count INTEGER NOT NULL DEFAULT 0,
+    last_offense_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, tenant_id)
+);
+
+-- Virus scanning indexes
+CREATE INDEX IF NOT EXISTS idx_virus_scan_jobs_status ON virus_scan_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_virus_scan_jobs_tenant ON virus_scan_jobs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_virus_scan_jobs_pending ON virus_scan_jobs(created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_virus_scan_jobs_next_retry ON virus_scan_jobs(status, next_retry_at) WHERE status = 'pending';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_virus_scan_jobs_file_pending ON virus_scan_jobs(file_id) WHERE status IN ('pending', 'scanning');
+CREATE INDEX IF NOT EXISTS idx_virus_scan_results_tenant ON virus_scan_results(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_virus_scan_results_infected ON virus_scan_results(tenant_id, is_infected) WHERE is_infected = true;
+CREATE INDEX IF NOT EXISTS idx_virus_scan_results_scanned_at ON virus_scan_results(scanned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_quarantined_files_tenant ON quarantined_files(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_malware_counts_user ON user_malware_counts(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_malware_counts_tenant ON user_malware_counts(tenant_id);
+
+-- Add scan_status column to files_metadata if not exists (for virus scanning)
+ALTER TABLE files_metadata ADD COLUMN IF NOT EXISTS scan_status VARCHAR(20) DEFAULT 'pending';
+-- Values: 'pending', 'clean', 'infected', 'skipped', 'error'
+CREATE INDEX IF NOT EXISTS idx_files_scan_status ON files_metadata(scan_status) WHERE scan_status = 'pending';
+
+-- Session unique active index (one active session per device per user)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_sessions_unique_active 
+ON user_sessions(user_id, fingerprint_hash) 
+WHERE is_revoked = false AND fingerprint_hash IS NOT NULL;
+
+-- ============================================================================
 -- VIEWS
 -- ============================================================================
 
@@ -926,5 +1067,18 @@ COMMENT ON COLUMN tenants.ip_blocklist IS 'Array of blocked IP addresses/CIDR ra
 COMMENT ON COLUMN tenants.ip_restriction_mode IS 'IP restriction mode: disabled, allowlist_only, blocklist_only, or both';
 COMMENT ON COLUMN security_alerts.alert_type IS 'Type of alert: failed_login_spike, new_ip_login, permission_escalation, suspended_access_attempt, bulk_download, blocked_extension_attempt, excessive_sharing, account_lockout';
 COMMENT ON COLUMN security_alerts.severity IS 'Alert severity: critical, high, medium, low';
+
+COMMENT ON TABLE replication_jobs IS 'Tracks async replication of files to secondary S3-compatible storage';
+COMMENT ON COLUMN replication_jobs.storage_path IS 'S3 key (path) of the object to replicate';
+COMMENT ON COLUMN replication_jobs.operation IS 'upload = copy to secondary, delete = remove from secondary (mirror mode)';
+COMMENT ON COLUMN replication_jobs.status IS 'pending = queued, processing = in progress, completed = done, failed = gave up after max retries';
+
+COMMENT ON TABLE virus_scan_settings IS 'Per-tenant virus scanning configuration';
+COMMENT ON TABLE virus_scan_jobs IS 'Queue of files pending virus scan';
+COMMENT ON TABLE virus_scan_results IS 'Results and metrics from virus scans';
+COMMENT ON TABLE quarantined_files IS 'Files quarantined due to detected malware';
+COMMENT ON TABLE user_malware_counts IS 'Tracks malware upload counts per user for auto-suspension';
+COMMENT ON COLUMN virus_scan_jobs.next_retry_at IS 'When this job should be retried (exponential backoff: 30s, 2min, 10min)';
+COMMENT ON COLUMN files_metadata.scan_status IS 'Virus scan status: pending, clean, infected, skipped, error';
 
 
