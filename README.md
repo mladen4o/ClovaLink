@@ -264,9 +264,9 @@ podman compose up -d
 | Role | Email | Password |
 |------|-------|----------|
 | SuperAdmin | superadmin@clovalink.com | password123 |
-| Admin | admin@acme.com | password123 |
-| Manager | manager@acme.com | password123 |
-| Employee | employee@acme.com | password123 |
+| Admin | admin@clovalink.com | password123 |
+| Manager | manager@clovalink.com | password123 |
+| Employee | employee@clovalink.com | password123 |
 
 > **Change these credentials immediately in production!**
 
