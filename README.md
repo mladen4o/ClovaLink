@@ -227,41 +227,139 @@ Real-time monitoring for unusual activity patterns:
 
 ## Quick Start
 
-### Prerequisites
+### Step 1: Install Docker
 
-- Docker or Podman
+If you don't have Docker installed yet:
 
-### Quick Deploy (Pre-built Images)
+| Operating System | Installation |
+|------------------|--------------|
+| **Windows** | Download [Docker Desktop](https://www.docker.com/products/docker-desktop/) and run the installer |
+| **Mac** | Download [Docker Desktop](https://www.docker.com/products/docker-desktop/) or run `brew install --cask docker` |
+| **Linux (Ubuntu/Debian)** | Run: `curl -fsSL https://get.docker.com | sh` |
 
-**No compilation required** — just download 2 files and run:
+Verify Docker is installed:
+```bash
+docker --version
+# Should show: Docker version 24.x or higher
+```
+
+### Step 2: Download ClovaLink
+
+Open a terminal and run these commands one at a time:
 
 ```bash
-# Create directory and download configs
-mkdir clovalink && cd clovalink
+# Create a folder for ClovaLink
+mkdir clovalink
+cd clovalink
+
+# Download the configuration files
 curl -LO https://raw.githubusercontent.com/ClovaLink/ClovaLink/main/infra/compose.yml
 curl -LO https://raw.githubusercontent.com/ClovaLink/ClovaLink/main/infra/.env.example
+```
 
-# Configure and start
+### Step 3: Configure Your Settings
+
+```bash
+# Create your config file from the example
 mv .env.example .env
-nano .env  # Set your secrets (JWT_SECRET, S3 credentials, etc.)
+
+# Open it in a text editor
+nano .env    # Linux/Mac
+# Or: notepad .env    # Windows
+```
+
+**Important settings to change:**
+- `JWT_SECRET` - Change this to a random string (at least 32 characters)
+- `POSTGRES_PASSWORD` - Set a secure database password
+
+Save the file when done (in nano: press `Ctrl+X`, then `Y`, then `Enter`).
+
+### Step 4: Start ClovaLink
+
+```bash
 docker compose up -d
 ```
 
-That's it! Pre-built images are pulled automatically from GitHub Container Registry.
+This will download and start all the services. First run takes 2-5 minutes.
 
-<details>
-<summary><b>Using Podman?</b></summary>
+### Step 5: Access ClovaLink
+
+Open your browser and go to:
+
+| Service | URL |
+|---------|-----|
+| **Web Interface** | http://localhost:8080 |
+| API | http://localhost:3000 |
+
+### Default Login Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| SuperAdmin | superadmin@clovalink.com | password123 |
+| Admin | admin@clovalink.com | password123 |
+| Manager | manager@clovalink.com | password123 |
+| Employee | employee@clovalink.com | password123 |
+
+> **Important:** Change these passwords immediately after first login!
+
+### Useful Commands
 
 ```bash
-podman-compose up -d
+# Check if everything is running
+docker compose ps
+
+# View logs (if something isn't working)
+docker compose logs -f
+
+# Stop ClovaLink
+docker compose down
+
+# Restart ClovaLink
+docker compose restart
+
+# Update to latest version
+docker compose pull
+docker compose up -d
 ```
+
+### Troubleshooting
+
+<details>
+<summary><b>Port 8080 already in use?</b></summary>
+
+Edit `compose.yml` and change `8080:80` to another port like `8888:80`, then run `docker compose up -d` again.
 
 </details>
 
 <details>
-<summary><b>Alternative: Clone Full Repository</b></summary>
+<summary><b>Docker command not found?</b></summary>
 
-If you want the full source code:
+Make sure Docker Desktop is running (Windows/Mac) or the Docker service is started (Linux: `sudo systemctl start docker`).
+
+</details>
+
+<details>
+<summary><b>Permission denied errors on Linux?</b></summary>
+
+Add your user to the docker group:
+```bash
+sudo usermod -aG docker $USER
+```
+Then log out and log back in.
+
+</details>
+
+<details>
+<summary><b>Using Podman instead of Docker?</b></summary>
+
+Replace `docker compose` with `podman-compose` in all commands.
+
+</details>
+
+### Advanced Options
+
+<details>
+<summary><b>Clone Full Repository (for developers)</b></summary>
 
 ```bash
 git clone https://github.com/ClovaLink/ClovaLink.git
@@ -274,24 +372,15 @@ docker compose up -d
 </details>
 
 <details>
-<summary><b>Building from Source (Developers)</b></summary>
+<summary><b>Build from Source</b></summary>
 
-If you want to build locally instead of using pre-built images:
+Requires 8GB+ RAM for Rust compilation:
 
 ```bash
 git clone https://github.com/ClovaLink/ClovaLink.git
 cd ClovaLink/infra
 cp .env.example .env
-
-# Requires 8GB+ RAM for Rust compilation
 docker compose -f compose.yml -f compose.build.yml up -d --build
-```
-
-For low-memory systems (2-4GB RAM), limit parallel jobs:
-
-```bash
-# Edit infra/compose.build.yml and set CARGO_BUILD_JOBS: 1
-# Or add swap space before building
 ```
 
 </details>
@@ -299,19 +388,15 @@ For low-memory systems (2-4GB RAM), limit parallel jobs:
 <details>
 <summary><b>Alternative Container Registries</b></summary>
 
-Images are published to both GHCR and Docker Hub:
+Images are available from both GHCR and Docker Hub:
 
 ```yaml
 # GitHub Container Registry (default)
 image: ghcr.io/clovalink/clovalink-backend:latest
-image: ghcr.io/clovalink/clovalink-frontend:latest
 
-# Docker Hub
+# Docker Hub (alternative)
 image: clovalink/clovalink-backend:latest
-image: clovalink/clovalink-frontend:latest
 ```
-
-Edit `compose.yml` to switch registries if needed.
 
 </details>
 
