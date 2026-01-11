@@ -230,18 +230,24 @@ Real-time monitoring for unusual activity patterns:
 ### Prerequisites
 
 - Docker or Podman
-- Git
 
-### One-Command Setup
+### Quick Deploy (Pre-built Images)
 
-Pre-built images are pulled automatically — **no compilation required**.
+**No compilation required** — just download 2 files and run:
 
 ```bash
-# Clone and start
-git clone https://github.com/ClovaLink/ClovaLink.git
-cd ClovaLink/infra
+# Create directory and download configs
+mkdir clovalink && cd clovalink
+curl -LO https://raw.githubusercontent.com/ClovaLink/ClovaLink/main/infra/compose.yml
+curl -LO https://raw.githubusercontent.com/ClovaLink/ClovaLink/main/infra/.env.example
+
+# Configure and start
+mv .env.example .env
+nano .env  # Set your secrets (JWT_SECRET, S3 credentials, etc.)
 docker compose up -d
 ```
+
+That's it! Pre-built images are pulled automatically from GitHub Container Registry.
 
 <details>
 <summary><b>Using Podman?</b></summary>
@@ -253,16 +259,36 @@ podman-compose up -d
 </details>
 
 <details>
+<summary><b>Alternative: Clone Full Repository</b></summary>
+
+If you want the full source code:
+
+```bash
+git clone https://github.com/ClovaLink/ClovaLink.git
+cd ClovaLink/infra
+cp .env.example .env
+nano .env
+docker compose up -d
+```
+
+</details>
+
+<details>
 <summary><b>Building from Source (Developers)</b></summary>
 
 If you want to build locally instead of using pre-built images:
 
 ```bash
+git clone https://github.com/ClovaLink/ClovaLink.git
+cd ClovaLink/infra
+cp .env.example .env
+
 # Requires 8GB+ RAM for Rust compilation
 docker compose -f compose.yml -f compose.build.yml up -d --build
 ```
 
 For low-memory systems (2-4GB RAM), limit parallel jobs:
+
 ```bash
 # Edit infra/compose.build.yml and set CARGO_BUILD_JOBS: 1
 # Or add swap space before building
@@ -285,7 +311,7 @@ image: clovalink/clovalink-backend:latest
 image: clovalink/clovalink-frontend:latest
 ```
 
-Edit `infra/compose.yml` to switch registries if needed.
+Edit `compose.yml` to switch registries if needed.
 
 </details>
 
