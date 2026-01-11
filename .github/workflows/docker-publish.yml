@@ -9,6 +9,9 @@ on:
 env:
   BACKEND_IMAGE: clovalink-backend
   FRONTEND_IMAGE: clovalink-frontend
+  # Registry paths (must be lowercase)
+  GHCR_OWNER: clovalink
+  DOCKERHUB_OWNER: clovalink
 
 jobs:
   # Build backend for amd64 (native x64 runner)
@@ -49,8 +52,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:amd64
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.BACKEND_IMAGE }}:amd64
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:amd64
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.BACKEND_IMAGE }}:amd64
           cache-from: type=gha,scope=backend-amd64
           cache-to: type=gha,mode=max,scope=backend-amd64
 
@@ -92,8 +95,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.BACKEND_IMAGE }}:arm64
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:arm64
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.BACKEND_IMAGE }}:arm64
           cache-from: type=gha,scope=backend-arm64
           cache-to: type=gha,mode=max,scope=backend-arm64
 
@@ -121,22 +124,22 @@ jobs:
       
       - name: Create and push GHCR manifest
         run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:latest \
-            ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:amd64 \
-            ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:arm64
+          docker buildx imagetools create -t ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:latest \
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:amd64 \
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:arm64
           
           # Also tag with branch/tag name
           if [[ "${{ github.ref_name }}" != "main" ]]; then
-            docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:${{ github.ref_name }} \
-              ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:amd64 \
-              ghcr.io/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE }}:arm64
+            docker buildx imagetools create -t ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:${{ github.ref_name }} \
+              ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:amd64 \
+              ghcr.io/${{ env.GHCR_OWNER }}/${{ env.BACKEND_IMAGE }}:arm64
           fi
       
       - name: Create and push Docker Hub manifest
         run: |
-          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.BACKEND_IMAGE }}:latest \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.BACKEND_IMAGE }}:amd64 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.BACKEND_IMAGE }}:arm64
+          docker buildx imagetools create -t ${{ env.DOCKERHUB_OWNER }}/${{ env.BACKEND_IMAGE }}:latest \
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.BACKEND_IMAGE }}:amd64 \
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.BACKEND_IMAGE }}:arm64
 
   # Build frontend for amd64 (native x64 runner)
   build-frontend-amd64:
@@ -173,8 +176,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:amd64
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_IMAGE }}:amd64
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:amd64
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.FRONTEND_IMAGE }}:amd64
           cache-from: type=gha,scope=frontend-amd64
           cache-to: type=gha,mode=max,scope=frontend-amd64
 
@@ -213,8 +216,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:arm64
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_IMAGE }}:arm64
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:arm64
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.FRONTEND_IMAGE }}:arm64
           cache-from: type=gha,scope=frontend-arm64
           cache-to: type=gha,mode=max,scope=frontend-arm64
 
@@ -242,19 +245,19 @@ jobs:
       
       - name: Create and push GHCR manifest
         run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:latest \
-            ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:amd64 \
-            ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:arm64
+          docker buildx imagetools create -t ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:latest \
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:amd64 \
+            ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:arm64
           
           # Also tag with branch/tag name
           if [[ "${{ github.ref_name }}" != "main" ]]; then
-            docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:${{ github.ref_name }} \
-              ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:amd64 \
-              ghcr.io/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE }}:arm64
+            docker buildx imagetools create -t ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:${{ github.ref_name }} \
+              ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:amd64 \
+              ghcr.io/${{ env.GHCR_OWNER }}/${{ env.FRONTEND_IMAGE }}:arm64
           fi
       
       - name: Create and push Docker Hub manifest
         run: |
-          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_IMAGE }}:latest \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_IMAGE }}:amd64 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_IMAGE }}:arm64
+          docker buildx imagetools create -t ${{ env.DOCKERHUB_OWNER }}/${{ env.FRONTEND_IMAGE }}:latest \
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.FRONTEND_IMAGE }}:amd64 \
+            ${{ env.DOCKERHUB_OWNER }}/${{ env.FRONTEND_IMAGE }}:arm64
